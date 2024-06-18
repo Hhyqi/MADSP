@@ -1,6 +1,6 @@
 # MADSP:a deep learning model based on multi-source information fusion and attention mechanism for drug combination synergy prediction
 
-![GraphPath](https://github.com/Hhyqi/MADSP/blob/master/Figures/model.png)
+![GraphPath](https://github.com/Hhyqi/MADSP/blob/master/Figures/MADSP.png)
 
 ## Introduction
 
