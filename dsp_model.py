@@ -235,7 +235,6 @@ class DSPSCL:
             print("\r", end="")
             print("{}%: ".format(int((epo)*(100/train_epoch))+1), "▓" * int((epo // 2)*(100/train_epoch)), end="")
             sys.stdout.flush()
-            self.predict(testdata)
         with open(self.pkl_file, 'wb') as pck:
             pickle.dump(loss_history, pck)
         print('\n--- Training Finished ---')
