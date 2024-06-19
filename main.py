@@ -45,7 +45,6 @@ if __name__ == '__main__':
             model.train(tr_drug=traindrdata, tr_cl=traincldata,testdata = test_generator)
             
         rmse,person,spearman,ci = model.predict(test_generator)
-        model.predict_auc(test_generator)
         rmse_all = rmse_all + rmse
         person_all = person_all + person
         spearman_all = spearman_all + spearman
