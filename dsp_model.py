@@ -28,6 +28,7 @@ from sklearn.model_selection import train_test_split
 import sys
 device = torch.device('cuda:7')
 con_loss_T = 0.05
+
 class data_process_loader(data.Dataset):
     def __init__(self, list_IDs, labels, drug_df,rna_df,types):
         self.labels = labels
