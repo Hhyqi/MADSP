@@ -21,7 +21,7 @@ import seaborn as sns
 from torch_geometric import data as DATA
 
 time_str = str(datetime.now().strftime('%y%m%d%H%M'))
-
+ 
 #files
 OUTPUT_DIR = 'results/results_loewe/'
 if not os.path.exists(OUTPUT_DIR):
