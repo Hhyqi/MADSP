@@ -19,9 +19,11 @@ from rdkit.Chem.Draw import IPythonConsole
 import matplotlib.pyplot as plt
 import seaborn as sns
 from torch_geometric import data as DATA
-
+import pickle
+import torch
+from transformers import BertTokenizer, AutoTokenizer,BertModel,RobertaTokenizer,RobertaModel
 time_str = str(datetime.now().strftime('%y%m%d%H%M'))
- 
+
 #files
 OUTPUT_DIR = 'results/results_loewe/'
 if not os.path.exists(OUTPUT_DIR):
@@ -48,11 +50,11 @@ def FeatureExtract(drug_feature):
 
 class GetData():
     def __init__(self):
-        PATH = '/home/hongyuqi/work/paper/baseline/MADSP-main'
+        PATH = '/home/work/paper/baseline/MADSP-main'
         self.synergyfile    =   PATH + '/data/synergyloewe.txt'
         self.drugsmilefile  =   PATH + '/data/smiles.csv'
-        self.targetfile     =   PATH + '/data/drug_target.npy'
-        self.pathwayfile    =   PATH + '/data/drug_pathway.npy'
+        self.targetfile     =   PATH + "/data/drug_protein_feature.pkl"
+        self.pathwayfile    =   PATH + "/data//drug_pathway_feature.pkl"
         self.cinfofile      =   PATH + '/data/cell2id.tsv'
         self.cfeaturefile   =   PATH + '/data/oneil_cellline_feat.npy'
     # 生成摩根指纹函数
@@ -61,7 +63,7 @@ class GetData():
         data = [x for x in data if x is not None]
         data_mols = [Chem.MolFromSmiles(s) for s in data]
         data_mols = [x for x in data_mols if x is not None]
-        data_fps = [AllChem.GetMorganFingerprintAsBitVect(x,3,2048) for x in data_mols]
+        data_fps = [AllChem.GetMorganFingerprintAsBitVect(x,3,1024) for x in data_mols]
         return data_fps
     
     def feature_vector(self,feature_name, df, vector_size): 
@@ -89,7 +91,7 @@ class GetData():
             compound_iso_smiles = compound_iso_smiles
             morgan_fp = {}
             for index,smile in enumerate(compound_iso_smiles):
-                morgan_fp[df['name'][index]] = list(map(int,self.product_fps([smile])[0].ToBitString()))
+                morgan_fp[df['name'][index]] = list(map(int,self.product_fps([smile])[0].ToBitString())) 
             return morgan_fp
     # 归一化
     def data_format(self, data):
@@ -131,7 +133,8 @@ class GetData():
                 cell_dataset['label'].append(float(score))
                 cell_dataset['fold'].append(int(fold))
 
-        durg_dataset['drug_encoding'] = np.array(durg_dataset['drug_encoding'])
+    
+        durg_dataset['drug_encoding'] = np.array(durg_dataset['drug_encoding'], dtype=np.float64)
         
         durg_dataset['label'] = np.array(durg_dataset['label'])
         durg_dataset['fold'] = np.array(durg_dataset['fold'])
@@ -173,19 +176,24 @@ class GetData():
     def prepare(self):
         # 得到药物特征
         durg_morgan = self.create_data('morgan')
-        drug_target = np.load(self.targetfile)
-        drug_pathway = np.load(self.pathwayfile)
+        # drug_target = np.load(self.targetfile)
+        # drug_pathway = np.load(self.pathwayfile)
+        with open(self.targetfile, 'rb') as f:
+            drug_target = pickle.load(f)
+        with open(self.pathwayfile, 'rb') as f:
+            drug_pathway = pickle.load(f)
         df = pd.read_csv(self.drugsmilefile) 
         feature_name = df["name"]
         vector_size = len(feature_name)
         drug_feature = {}
         morgan_vector = np.zeros((len(np.array(feature_name).tolist()), 0), dtype=float)
         morgan_vector = np.hstack((morgan_vector, self.feature_vector(feature_name, durg_morgan, vector_size)))
-        morgan_vector = np.pad(morgan_vector, ((0, 0), (0, 88-morgan_vector.shape[1])), mode='constant')
-        drug_target = np.pad(drug_target, ((0, 0), (0, 88-drug_target.shape[1])), mode='constant')
-        drug_pathway = np.pad(drug_pathway, ((0, 0), (0, 88-drug_pathway.shape[1])), mode='constant')
+        morgan_vector = np.pad(morgan_vector, ((0, 0), (0, 1024-morgan_vector.shape[1])), mode='constant')
+        # drug_target = np.pad(drug_target, ((0, 0), (0, 88-drug_target.shape[1])), mode='constant')
+        # drug_pathway = np.pad(drug_pathway, ((0, 0), (0, 88-drug_pathway.shape[1])), mode='constant')
         for i in range(len(feature_name)):
-            drug_feature[feature_name[i]] =  [list(morgan_vector[i]),list(drug_target[i]),list(drug_pathway[i])]# 
+            #durg_morgan[feature_name[i]] = np.pad(durg_morgan[feature_name[i]], (0, 1024-durg_morgan[feature_name[i]].shape[0]), mode='constant')
+            drug_feature[feature_name[i]] =  [list(durg_morgan[feature_name[i]]),list(morgan_vector[i]),list(drug_target[feature_name[i]]),list(drug_pathway[feature_name[i]])]# 
         cell_info = pd.read_csv(self.cinfofile, sep='\t', header=0)
         c_feature = np.load(self.cfeaturefile)
         cell_feature = {}
