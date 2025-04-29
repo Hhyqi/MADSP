@@ -237,12 +237,12 @@ class DSPSCL:
                 loss.backward()
                 opt.step()            
                 running_loss += loss.item()
-            print(str(epo)+"  ", end="")
+            #print(str(epo)+"  ", end="")
             
             
             self.predict(testdata)
-            # print("\r", end="")
-            # print("{}%: ".format(int((epo)*(100/train_epoch))+1), "▓" * int((epo // 2)*(100/train_epoch)), end="")
+            print("\r", end="")
+            print("{}%: ".format(int((epo)*(100/train_epoch))+1), "▓" * int((epo // 2)*(100/train_epoch)), end="")
             sys.stdout.flush()
         with open(self.pkl_file, 'wb') as pck:
             pickle.dump(loss_history, pck)
@@ -251,11 +251,11 @@ class DSPSCL:
     def predict(self,test_generator):
         with torch.set_grad_enabled(False):
             rmse,person, spearman, CI,y_true,y_pred   = self.test(test_generator, self.model)
-            print(
-            'RMSE: ' + str(rmse)[:7] +
-            ' , Pearson Correlation: ' + str(person)[:7] +
-            ' Spearman Correlation: ' + str(spearman)[:7] +
-            ' , Concordance Index: ' + str(CI)[:7])
+            # print(
+            # 'RMSE: ' + str(rmse)[:7] +
+            # ' , Pearson Correlation: ' + str(person)[:7] +
+            # ' Spearman Correlation: ' + str(spearman)[:7] +
+            # ' , Concordance Index: ' + str(CI)[:7])
         return rmse,person,spearman,CI
     def predict_auc(self,test_generator):
         with torch.set_grad_enabled(False):
