@@ -41,15 +41,14 @@ if __name__ == '__main__':
             os.mkdir(modeldir)
 
         for hid in hiddim:
-            model = DSPSCL(modeldir=modeldir,foldnum = fold,hiddim=hid)
+            model = DSPSCL(modeldir=modeldir,foldnum = fold,hiddim=hid,mmse = 1000)
             model.train(tr_drug=traindrdata, tr_cl=traincldata,testdata = test_generator)
-            
+
         rmse,person,spearman,ci = model.predict(test_generator)
         rmse_all = rmse_all + rmse
         person_all = person_all + person
         spearman_all = spearman_all + spearman
         CI_all = CI_all + ci
-        
         model.save_model()
         print("Model Saveed :{}".format(modelfile))
         print("Rmse:"+str(rmse)+" Person:"+str(person)+" Spearman:"+str(spearman)+" CI:"+str(ci))
