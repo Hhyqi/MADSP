@@ -26,10 +26,10 @@ from sklearn.metrics import roc_auc_score, average_precision_score, accuracy_sco
 from sklearn.metrics import precision_recall_curve
 from sklearn.model_selection import train_test_split
 import sys
-device = torch.device('cuda:7')
-con_loss_T = 0.05
+device = torch.device('cuda:2')
 
-class data_process_loader(data.Dataset):
+con_loss_T = 0.05                   
+class data_process_loader(data.Dataset):            
     def __init__(self, list_IDs, labels, drug_df,rna_df,types):
         self.labels = labels
         self.list_IDs = list_IDs
@@ -40,7 +40,7 @@ class data_process_loader(data.Dataset):
     def __len__(self):
         'Denotes the total number of samples'
         return len(self.list_IDs)
- 
+
     def __getitem__(self, index):
         'Generates one sample of data'
         #index = self.list_IDs[index]
@@ -95,20 +95,21 @@ class MultiHeadAttention(torch.nn.Module):
         self.fc = torch.nn.Linear(self.n_heads * self.d_v, self.ouput_dim, bias=False)
     def forward(self,X):
         ## (S, D) -proj-> (S, D_new) -split-> (S, H, W) -trans-> (H, S, W)
+        batch_size, seq_len, _ = X.shape
         Q=self.W_Q(X).view( -1, self.n_heads, self.d_k).transpose(0,1)
         K=self.W_K(X).view( -1, self.n_heads, self.d_k).transpose(0,1)
         V=self.W_V(X).view( -1, self.n_heads, self.d_v).transpose(0,1)
-        
         scores = torch.matmul(Q, K.transpose(-1, -2)) / np.sqrt(self.d_k)
         # context: [n_heads, len_q, d_v], attn: [n_heads, len_q, len_k]
         attn = torch.nn.Softmax(dim=-1)(scores)
-        context = torch.matmul(attn, V)                                                       
+        context = torch.matmul(attn, V)  
         # context: [len_q, n_heads * d_v]
         context = context.transpose(1, 2).reshape(-1, self.n_heads * self.d_v)
         output = self.fc(context)
         output = output.reshape((X.shape[0], X.shape[1],X.shape[2]))
         return output
 
+    
 class EncoderLayer(torch.nn.Module):
     def __init__(self,input_dim,n_heads):
         super(EncoderLayer, self).__init__()
@@ -139,7 +140,6 @@ class feature_encoder(torch.nn.Module):  # twin network
         
 
     def forward(self, X):
-
         for layer in self.layers:
             X = layer(X)
         X1=self.AN(X)
@@ -148,14 +148,15 @@ class feature_encoder(torch.nn.Module):  # twin network
 class Model(torch.nn.Module):
     def __init__(self,hiddim):
         super(Model, self).__init__()
-        self.predictor = Predictor(1536,hiddim)
-        self.AN = feature_encoder(88,8,2)
+        self.predictor = Predictor(1792,hiddim)
+        self.AN = feature_encoder(1024,8,2) #8
     def forward(self, VF):
         
         DAF1 = torch.stack(VF[0])
         DBF1 = torch.stack(VF[1])
         CF1 = torch.stack(VF[2])
         DFC1 = torch.cat((DAF1,DBF1), dim=1) 
+        
         AC = self.AN(DFC1)
         AC = AC.reshape(AC.shape[0], AC.shape[1]*AC.shape[2])
         FC = torch.cat((AC,CF1), 1)
@@ -172,11 +173,13 @@ class myloss(nn.Module):
     
 
 class DSPSCL:
-    def __init__(self,modeldir,foldnum,hiddim):
+    def __init__(self,modeldir,foldnum,hiddim,mmse):
         self.model = Model(hiddim)
         self.modeldir = modeldir
         self.record_file = os.path.join(self.modeldir, "valid_fold"+str(foldnum)+".txt")
         self.pkl_file = os.path.join(self.modeldir, "loss_curve_iter.pkl")
+        self.msemax = mmse
+        self.fold = foldnum
     def test(self,datagenerator,model):
         y_label = []
         y_pred = []
@@ -193,11 +196,13 @@ class DSPSCL:
             logits = torch.squeeze(score).detach().cpu().numpy()
             label_ids = label.to('cpu').numpy()
             y_label = y_label + label_ids.flatten().tolist()
-            y_pred = y_pred + logits.flatten().tolist()
+            y_pred = y_pred + logits.flatten().tolist() 
             tloss  +=  loss.item()
             t = time.time()
-        model.train()
 
+        model.train()
+        mset =  mean_squared_error(y_label, y_pred)
+        
         return np.sqrt(mean_squared_error(y_label, y_pred)), \
                pearsonr(y_label, y_pred)[0], \
                spearmanr(y_label, y_pred)[0], \
@@ -232,9 +237,12 @@ class DSPSCL:
                 loss.backward()
                 opt.step()            
                 running_loss += loss.item()
-            # print(str(epo)+"  ", end="")
-            print("\r", end="")
-            print("{}%: ".format(int((epo)*(100/train_epoch))+1), "▓" * int((epo // 2)*(100/train_epoch)), end="")
+            print(str(epo)+"  ", end="")
+            
+            
+            self.predict(testdata)
+            # print("\r", end="")
+            # print("{}%: ".format(int((epo)*(100/train_epoch))+1), "▓" * int((epo // 2)*(100/train_epoch)), end="")
             sys.stdout.flush()
         with open(self.pkl_file, 'wb') as pck:
             pickle.dump(loss_history, pck)
@@ -243,11 +251,11 @@ class DSPSCL:
     def predict(self,test_generator):
         with torch.set_grad_enabled(False):
             rmse,person, spearman, CI,y_true,y_pred   = self.test(test_generator, self.model)
-            # print(
-            # 'RMSE: ' + str(rmse)[:7] +
-            # ' , Pearson Correlation: ' + str(person)[:7] +
-            # ' Spearman Correlation: ' + str(spearman)[:7] +
-            # ' , Concordance Index: ' + str(CI)[:7])
+            print(
+            'RMSE: ' + str(rmse)[:7] +
+            ' , Pearson Correlation: ' + str(person)[:7] +
+            ' Spearman Correlation: ' + str(spearman)[:7] +
+            ' , Concordance Index: ' + str(CI)[:7])
         return rmse,person,spearman,CI
     def predict_auc(self,test_generator):
         with torch.set_grad_enabled(False):
